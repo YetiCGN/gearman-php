@@ -26,7 +26,6 @@ namespace Kicken\Gearman;
 
 
 use Kicken\Gearman\Exception\NoRegisteredFunctionException;
-use Kicken\Gearman\Exception\TimeoutException;
 use Kicken\Gearman\Job\JobDetails;
 use Kicken\Gearman\Job\WorkerJob;
 use Kicken\Gearman\Protocol\Connection;
@@ -36,6 +35,7 @@ use Kicken\Gearman\Protocol\PacketType;
 
 /**
  * A class for registering functions with and waiting for work from a Gearman server.
+ *
  * @package Kicken\Gearman
  */
 class Worker {
@@ -82,6 +82,7 @@ class Worker {
      * @param string $name The name of the function.
      * @param callable $callback A callback to be executed when a job is received.
      * @param int|null $timeout A time limit on how the server should wait for a response.
+     *
      * @return $this
      */
     public function registerFunction($name, callable $callback, $timeout = null){
@@ -109,14 +110,8 @@ class Worker {
         if (!$this->stop){
             $this->grabJob();
             while (!$this->stop){
-                try {
-                    $packet = $this->connection->readPacket($this->timeout);
-                    $this->processPacket($packet);
-                } catch (TimeoutException $e){
-                    //Ignore timeouts due to no work available.
-                    //send a sleep to detect dead connections.
-                    $this->sleep();
-                }
+                $packet = $this->connection->readPacket($this->timeout);
+                $this->processPacket($packet);
             }
         }
     }
