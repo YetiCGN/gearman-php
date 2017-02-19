@@ -10,6 +10,6 @@ namespace Kicken\Gearman\Exception;
 
 class TimeoutException extends \RuntimeException {
     public function __construct(){
-        parent::__construct("Timeout occurred while reading socket data.");
+        parent::__construct("Timeout occurred.");
     }
 }

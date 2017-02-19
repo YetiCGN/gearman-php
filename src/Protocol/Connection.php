@@ -111,24 +111,39 @@ class Connection {
      * Blocks until the packet has been sent.
      *
      * @param Packet $packet
+     * @param int|bool $timeout
      */
-    public function writePacket(Packet $packet){
+    public function writePacket(Packet $packet, $timeout = false){
         if (!$this->stream){
-            $this->connect();
+            $this->connect($timeout);
         }
 
-        $this->write((string)$packet);
+        $this->write((string)$packet, $timeout);
     }
 
-    private function write($data){
+    private function write($data, $timeout){
         if (!$this->stream || feof($this->stream)){
             throw new NotConnectedException;
         }
 
-        $written = fwrite($this->stream, $data);
-        if ($written === 0){
-            throw new LostConnectionException;
+        if ($timeout !== false){
+            $sec = $timeout / 1000;
+            $usec = ($timeout % 1000) * 1000;
+            stream_set_timeout($this->stream, $sec, $usec);
         }
+
+        $start = (int)(microtime(true) * 1000);
+        do {
+            $written = fwrite($this->stream, $data);
+            $end = (int)(microtime(true) * 1000);
+            if ($written === 0){
+                if (feof($this->stream)){
+                    throw new LostConnectionException;
+                } else if ($timeout !== false && $end - $start >= $timeout){
+                    throw new TimeoutException;
+                }
+            }
+        } while ($written === 0);
 
         fflush($this->stream);
     }

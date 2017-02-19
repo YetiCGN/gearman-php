@@ -26,6 +26,7 @@ namespace Kicken\Gearman;
 
 
 use Kicken\Gearman\Exception\NoRegisteredFunctionException;
+use Kicken\Gearman\Exception\TimeoutException;
 use Kicken\Gearman\Job\JobDetails;
 use Kicken\Gearman\Job\WorkerJob;
 use Kicken\Gearman\Protocol\Connection;
@@ -52,6 +53,11 @@ class Worker {
      * @var bool
      */
     private $stop = false;
+
+    /**
+     * @var int|bool
+     */
+    private $timeout = false;
 
     /**
      * Create a new Gearman Worker to process jobs submitted to the server by clients.
@@ -87,7 +93,7 @@ class Worker {
             $packet = new Packet(PacketMagic::REQ, PacketType::CAN_DO_TIMEOUT, [$name, $timeout]);
         }
 
-        $this->connection->writePacket($packet);
+        $this->connection->writePacket($packet, $this->timeout);
 
         return $this;
     }
@@ -103,8 +109,14 @@ class Worker {
         if (!$this->stop){
             $this->grabJob();
             while (!$this->stop){
-                $packet = $this->connection->readPacket();
-                $this->processPacket($packet);
+                try {
+                    $packet = $this->connection->readPacket($this->timeout);
+                    $this->processPacket($packet);
+                } catch (TimeoutException $e){
+                    //Ignore timeouts due to no work available.
+                    //send a sleep to detect dead connections.
+                    $this->sleep();
+                }
             }
         }
     }
@@ -116,14 +128,34 @@ class Worker {
         $this->stop = true;
     }
 
+    /**
+     * Configure a timeout when waiting for foreground job results.
+     *
+     * @param int|bool $timeout Timeout in milliseconds or false for no timeout
+     */
+    public function setTimeout($timeout){
+        if ($timeout === true){
+            $timeout = 5000;
+        } else if ($timeout === -1){
+            $timeout = false;
+        }
+
+        if ($timeout < 0){
+            throw new \InvalidArgumentException('Timeout must be a positive integer or false.');
+        }
+
+
+        $this->timeout = $timeout;
+    }
+
     private function grabJob(){
         $packet = new Packet(PacketMagic::REQ, PacketType::GRAB_JOB_UNIQ);
-        $this->connection->writePacket($packet);
+        $this->connection->writePacket($packet, $this->timeout);
     }
 
     private function sleep(){
         $packet = new Packet(PacketMagic::REQ, PacketType::PRE_SLEEP);
-        $this->connection->writePacket($packet);
+        $this->connection->writePacket($packet, $this->timeout);
     }
 
     private function processPacket(Packet $packet){
@@ -165,7 +197,7 @@ class Worker {
     private function createWorkerJob(Packet $packet){
         $jobDetails = $this->createJobDetails($packet);
 
-        return new WorkerJob($jobDetails);
+        return new WorkerJob($jobDetails, $this->timeout);
     }
 
     private function createJobDetails(Packet $packet){
