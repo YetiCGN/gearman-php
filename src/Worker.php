@@ -130,7 +130,7 @@ class Worker {
      */
     public function setTimeout($timeout){
         if ($timeout === true){
-            $timeout = 5000;
+            $timeout = ini_get('default_socket_timeout');
         } else if ($timeout === -1){
             $timeout = false;
         }
