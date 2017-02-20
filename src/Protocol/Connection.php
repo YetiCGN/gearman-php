@@ -127,7 +127,7 @@ class Connection {
         }
 
         if ($timeout !== false){
-            $sec = $timeout / 1000;
+            $sec = (int)($timeout / 1000);
             $usec = ($timeout % 1000) * 1000;
             stream_set_timeout($this->stream, $sec, $usec);
         }
@@ -156,7 +156,7 @@ class Connection {
         $start = (int)(microtime(true) * 1000);
         do {
             if ($timeout !== false){
-                $sec = $timeout / 1000;
+                $sec = (int)($timeout / 1000);
                 $usec = ($timeout % 1000) * 1000;
                 stream_set_timeout($this->stream, $sec, $usec);
             }
